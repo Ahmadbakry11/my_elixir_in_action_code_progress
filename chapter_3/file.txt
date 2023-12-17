@@ -1,0 +1,8 @@
+How do I take the square root of a number in Elixir? 
+There doesn't seem to be a Math module or anything, and there is no function like sqrt().
+Elixir compiles to BEAM, which makes it compatible with Erlang modules. As you said,
+You were right to ask - since it is never obvious 
+when Erlang actually takes back responsibility in things Elixir. 
+:math.sqrt(x) is essentially running Erlang code.
+Hah. Found it. You take the square root like this:
+:math.sqrt(x)
