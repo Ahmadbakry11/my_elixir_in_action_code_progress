@@ -1,3 +1,58 @@
+defmodule ServerProcess do
+  def start(callback_module) do
+    spawn(fn ->
+      initial_state = callback_module.init()
+      loop(callback_module, initial_state)
+    end)
+  end
+
+  def call(pid, request) do
+    send(pid, {:call, request, self()})
+
+    receive do
+      {:response, response} -> response
+    end
+  end
+
+  def cast(pid, request) do
+    send(pid, {:cast, request})
+  end
+
+  defp loop(callback_module, state) do
+    receive do
+      {:call, request, caller} ->
+        {reponse, new_state} = callback_module.handle_call(state, request)
+        send(caller, {:response, response})
+        loop(callback_module, new_state)
+
+      {:cast, request} ->
+        new_state = callback_module.handle_cast(state, request)
+        loop(new_state)
+    end
+  end
+end
+
+
+
+defmodule TodoServer do
+  def start() do
+    ServerProcess.start()
+  end
+
+  def init() do
+    TodoList.new()
+  end
+
+  def add_entry(server_pid, entry) do
+    TodoServer.cast(server_pid, {:put, entry})
+  end
+
+  def handle_cast(state, {:put, entry}) do
+    TodoList.add_entry(state, entry)
+  end
+end
+
+
 defmodule TodoEntry do
   defstruct id: nil, date: nil, title: nil
 
@@ -58,51 +113,3 @@ defmodule TodoList do
     end
   end
 end
-
-
-# as an example:
-e1 = TodoEntry.new(~D[2020-11-12], "Dentist")
-e2 = TodoEntry.new(~D[2020-11-12], "shopping")
-e3 = TodoEntry.new(~D[2020-11-15], "Gym")
-
-todo = TodoList.new()
-todo = TodoList.add_entry(todo, e1)
-todo = TodoList.add_entry(todo, e2)
-todo = TodoList.add_entry(todo, e3)
-
-# todo
-%TodoList{
-  auto_id: 3,
-  entries: %{
-    1 => %TodoEntry{id: 1, date: ~D[2020-11-12], title: "Dentist"},
-    2 => %TodoEntry{id: 2, date: ~D[2020-11-12], title: "shopping"}
-  }
-}
-
-updater = fn x -> %TodoEntry{id: x.id, date: x.date, title: "reading"} end
-
-todo = TodoList.update_entry(todo, 5, updater)
-# result
-%TodoList{
-  auto_id: 3,
-  entries: %{
-    1 => %TodoEntry{id: 1, date: ~D[2020-11-12], title: "Dentist"},
-    2 => %TodoEntry{id: 2, date: ~D[2020-11-12], title: "shopping"}
-  }
-}
-
-todo = TodoList.update_entry(todo, 1, updater)
-# result
-%TodoList{
-  auto_id: 3,
-  entries: %{
-    1 => %TodoEntry{id: 1, date: ~D[2020-11-12], title: "reading"},
-    2 => %TodoEntry{id: 2, date: ~D[2020-11-12], title: "shopping"}
-  }
-}
-
-entries = [
-  %{date: ~D[2020-11-13], title: "cooking food"},
-  %{date: ~D[2020-11-14], title: "biking"},
-  %{date: ~D[2020-11-17], title: "airport"}
-]
